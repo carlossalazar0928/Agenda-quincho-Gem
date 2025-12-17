@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agenda Quincho - Centro Asturiano</title>
+  <style>
+    :root {
+      --azul-primario: #1e3a8a;
+      --azul-claro: #3b82f6;
+      --amarillo: #f59e0b;
+      --amarillo-claro: #fbbf24;
+      --blanco: #ffffff;
+      --gris-claro: #f8fafc;
+      --gris: #64748b;
+      --rojo: #dc2626;
+      --verde: #10b981;
+    }
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+      background: linear-gradient(135deg, var(--azul-primario) 0%, var(--azul-claro) 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .container { max-width: 900px; margin: 0 auto; }
+    .header { text-align: center; color: var(--blanco); margin-bottom: 30px; padding: 20px; }
+    .header-logo { display: flex; align-items: center; justify-content: center; gap: 20px; margin-bottom: 10px; }
+    .header-logo img { width: 80px; height: 80px; border-radius: 50%; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+    .header h1 { font-size: 2.5em; background: linear-gradient(45deg, var(--amarillo), var(--blanco)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    
+    .card { background: var(--blanco); border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); padding: 40px; margin-bottom: 20px; position: relative; overflow: hidden; }
+    .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 5px; background: linear-gradient(90deg, var(--amarillo), var(--azul-primario)); }
+    
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); }
+    .modal.activa { display: flex !important; align-items: center; justify-content: center; }
+    .modal-content { background: var(--blanco); margin: 2rem; padding: 40px; border-radius: 20px; width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; position: relative; }
+    
+    /* ALERTA SEGURIDAD */
+    .seguridad-alerta { display: none; position: fixed; top: 20px; right: 20px; z-index: 10001; background: linear-gradient(135deg, var(--rojo), #b91c1c); color: white; padding: 25px 30px; border-radius: 20px; box-shadow: 0 25px 50px rgba(220,38,38,0.5); border: 3px solid rgba(255,255,255,0.2); max-width: 400px; animation: slideInRight 0.5s ease; }
+    @keyframes slideInRight { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    
+    .close, .close-alerta { position: absolute; right: 20px; top: 20px; font-size: 30px; color: var(--gris); cursor: pointer; transition: 0.3s; }
+    .close-alerta { color: white; top: 10px; right: 15px; font-size: 24px; }
+
+    .form-group { margin-bottom: 25px; }
+    label { display: block; font-weight: 600; color: var(--azul-primario); margin-bottom: 8px; }
+    input, select, textarea { width: 100%; padding: 15px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 16px; background: var(--gris-claro); }
+    
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px; }
+    
+    .checkbox-group { display: flex; align-items: center; gap: 12px; cursor: pointer; padding: 15px; background: var(--gris-claro); border-radius: 12px; transition: 0.3s; }
+    .checkbox-group.auto { background: var(--verde); color: white; }
+
+    button { background: linear-gradient(45deg, var(--azul-primario), var(--azul-claro)); color: white; border: none; padding: 18px; border-radius: 12px; font-weight: 700; cursor: pointer; width: 100%; margin: 10px 0; }
+    .btn-logout { background: var(--rojo) !important; width: auto !important; padding: 10px 20px !important; }
+    .btn-copiar { background: var(--verde); width: auto; padding: 10px 20px; }
+
+    .total-card { background: linear-gradient(135deg, var(--amarillo), var(--amarillo-claro)); color: var(--azul-primario); text-align: center; padding: 30px; border-radius: 20px; font-size: 1.8em; font-weight: bold; margin: 30px 0; }
+    .info-box { background: #fef3c7; border: 2px solid var(--amarillo); border-radius: 15px; padding: 20px; margin: 20px 0; }
+
+    .loader-spinner { border: 8px solid rgba(255,255,255,0.3); border-top: 8px solid var(--amarillo); border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    .seccion { display: none; }
+    .seccion.activa { display: block; }
+    .auto-calculado { background: #dbeafe; font-style: italic; }
+
+    @media (max-width: 768px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } .seguridad-alerta { right: 10px; left: 10px; } }
+  </style>
+</head>
+<body>
+
+  <div id="seguridadAlerta" class="seguridad-alerta">
+    <span class="close-alerta" onclick="cerrarAlertaSeguridad()">&times;</span>
+    <div style="font-size: 1.1em;">
+      <strong>👮‍♂️ ¡ATENCIÓN SEGURIDAD!</strong><br>
+      Para reuniones pasadas las 00:00hs se abona seguridad (5hs: $20.000).
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="header">
+      <div class="header-logo">
+        <img src="https://i.ibb.co/q3d6Ktzm/logo-centro-asturiano2.png" alt="Logo">
+        <div><h1>🏠 Agenda Quincho</h1><p>Centro Asturiano - ARS $</p></div>
+      </div>
+    </div>
+
+    <div id="modalValidacion" class="modal">
+      <div class="modal-content">
+        <h2>🔐 Validación de Socio</h2><br>
+        <div class="form-group"><label>Número de Socio</label><input type="number" id="numSocio" placeholder="Ej: 12345"></div>
+        <div class="form-group"><label>Fecha de Nacimiento</label><input type="date" id="fechaNac"></div>
+        <button onclick="validarSocio()">🚀 Ingresar</button>
+        <div id="errorValidacion" style="color:var(--rojo); display:none; margin-top:10px; font-weight:bold;">❌ Datos incorrectos</div>
+      </div>
+    </div>
+
+    <div id="loadingModal" class="modal">
+      <div style="display:flex; flex-direction:column; align-items:center;">
+        <div class="loader-spinner"></div>
+        <p id="loadingMessage" style="color:white; margin-top:20px; font-weight:600;">Cargando...</p>
+      </div>
+    </div>
+
+    <div id="formAgendamiento" class="seccion card">
+      <div id="adminIndicator" style="display:none; background:var(--rojo); color:white; padding:10px; border-radius:10px; margin-bottom:20px; text-align:center; font-weight:bold;">
+        👑 MODO ADMINISTRADOR ACTIVO <button class="btn-logout" onclick="logoutAdmin()">🚪 Salir</button>
+      </div>
+
+      <div class="info-box"><strong>⚠️ IMPORTANTE:</strong> Solo se agenda para control. Socio debe estar al día.</div>
+
+      <div class="form-group">
+        <label>Tipo de Agenda</label>
+        <select id="tipoQuincho" onchange="onTipoChange()">
+          <option value="">Seleccione...</option>
+          <option value="cerrado">🎪 Quincho Cerrado (Max 60 personas)</option>
+          <option value="parrilla">🔥 Parrillas Externas</option>
+        </select>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group"><label>Fecha</label><input type="date" id="fechaEvento" onchange="calcularTotal()"></div>
+        <div class="form-group"><label>Hora Inicio</label><input type="time" id="horaInicio" onchange="calcularTotal()"></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label>Hora Fin</label><input type="time" id="horaFin" onchange="calcularTotal()"></div>
+        <div class="form-group"><label>Invitados Aprox</label><input type="number" id="totalInvitados" class="auto-calculado" readonly></div>
+      </div>
+
+      <h3>👥 Invitados por Edad</h3>
+      <div class="grid-3">
+        <div class="form-group"><label>Mayores</label><input type="number" id="mayores" value="0" min="0" onchange="calcularTotal()"></div>
+        <div class="form-group"><label>Jubilados</label><input type="number" id="jubilados" value="0" min="0" onchange="calcularTotal()"></div>
+        <div class="form-group"><label>Juveniles</label><input type="number" id="juveniles" value="0" min="0" onchange="calcularTotal()"></div>
+        <div class="form-group"><label>Menores</label><input type="number" id="menores" value="0" min="0" onchange="calcularTotal()"></div>
+        <div class="form-group"><label>Infantiles</label><input type="number" id="infantiles" value="0" min="0" onchange="calcularTotal()"></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="checkbox-group" onclick="toggleCheckbox('inflable')">
+          <input type="checkbox" id="inflable" onchange="calcularTotal()"> <span>🎈 Trae Inflable (+$20k)</span>
+        </div>
+        <div class="checkbox-group" onclick="toggleCheckbox('cumpleanero')">
+          <input type="checkbox" id="cumpleanero" onchange="calcularTotal()"> <span>🎉 Socio Cumpleañero</span>
+        </div>
+      </div>
+
+      <div class="checkbox-group" id="seguridad-group" style="margin-top:15px;">
+        <input type="checkbox" id="seguridad" disabled> <span>🌙 Seguridad AUTO (+$20k ARS)</span>
+      </div>
+
+      <div id="totalDiv" class="total-card" style="display:none;">💰 Total: ARS $<span id="totalCalculado">0</span></div>
+
+      <div class="form-group"><label>Nombre Socio</label><input type="text" id="nombreSocio" readonly></div>
+      <div class="form-group"><label>📝 Lista / Detalle</label><textarea id="listaInvitados" rows="3"></textarea></div>
+
+      <button onclick="mostrarConfirmacion()" id="btnConfirmar" disabled>✅ Confirmar Agenda</button>
+    </div>
+
+    <div id="modalConfirmacion" class="modal">
+      <div class="modal-content">
+        <span class="close" onclick="cerrarModal('modalConfirmacion')">&times;</span>
+        <h2>📋 Detalle Final</h2>
+        <div id="detalleAgenda" style="background:var(--gris-claro); padding:20px; border-radius:12px; margin:20px 0;"></div>
+        
+        <h3>🏦 Datos Bancarios</h3>
+        <div style="background:var(--gris-claro); padding:15px; border-radius:12px;">
+          <p><strong>Banco Galicia</strong><br>CBU: 00700047-20000001084140</p>
+          <button class="btn-copiar" onclick="copiarCBU()">📋 Copiar CBU</button>
+        </div>
+        <button onclick="confirmarYGuardar()" style="margin-top:20px;">💾 Confirmar y Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwQYiTMZGFyUls7PrPVGmarRSXu9FXNoyMmK8mB0JRJP-YuAvM7GUzKb04pDpwqqqN64w/exec';
+    const ADMIN_SOCIO = '99999';
+    const ADMIN_FECHA = '01/02/1234';
+    
+    let socioValidado = '';
+    let isAdmin = false;
+    const tarifasLunJue = {mayores: 6200, jubilados: 3900, juveniles: 5000, menores: 3500, infantiles: 0};
+    const tarifasVieDom = {mayores: 7700, jubilados: 4900, juveniles: 5500, menores: 4000, infantiles: 0};
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const hoy = new Date().toISOString().split('T')[0];
+      document.getElementById('fechaEvento').min = hoy;
+      if (localStorage.getItem('adminSession') === 'true') {
+        activarModoAdmin();
+      } else {
+        document.getElementById('modalValidacion').classList.add('activa');
+      }
+    });
+
+    function validarSocio() {
+      const numSocio = document.getElementById('numSocio').value;
+      const fechaNacInput = document.getElementById('fechaNac').value;
+      
+      if (numSocio === ADMIN_SOCIO && fechaNacInput.split('-').reverse().join('/') === ADMIN_FECHA) {
+        activarModoAdmin();
+        return;
+      }
+
+      mostrarCargando("Verificando socio...");
+      fetch(`${APPS_SCRIPT_URL}?action=validarSocio&numSocio=${numSocio}&fechaNac=${fechaNacInput}`)
+        .then(r => r.json())
+        .then(res => {
+          ocultarCargando();
+          if (res.exito) {
+            socioValidado = res.nombre;
+            document.getElementById('nombreSocio').value = socioValidado;
+            cerrarModal('modalValidacion');
+            document.getElementById('formAgendamiento').classList.add('activa');
+          } else {
+            document.getElementById('errorValidacion').style.display = 'block';
+          }
+        }).catch(() => { ocultarCargando(); alert("Error de red"); });
+    }
+
+    function activarModoAdmin() {
+      isAdmin = true;
+      socioValidado = 'ADMINISTRADOR';
+      localStorage.setItem('adminSession', 'true');
+      document.getElementById('nombreSocio').value = 'ADMIN (Manual)';
+      document.getElementById('adminIndicator').style.display = 'block';
+      cerrarModal('modalValidacion');
+      document.getElementById('formAgendamiento').classList.add('activa');
+    }
+
+    function logoutAdmin() { localStorage.removeItem('adminSession'); location.reload(); }
+
+    function calcularTotal() {
+      const tipo = document.getElementById('tipoQuincho').value;
+      const fechaVal = document.getElementById('fechaEvento').value;
+      const hFin = document.getElementById('horaFin').value;
+
+      if (!tipo || !fechaVal) return;
+
+      const finH = parseInt(hFin.split(':')[0]);
+      const necesitaSeguridad = (finH >= 0 && finH <= 5);
+      document.getElementById('seguridad').checked = necesitaSeguridad;
+      document.getElementById('seguridad-group').className = necesitaSeguridad ? 'checkbox-group auto' : 'checkbox-group';
+      if (necesitaSeguridad) document.getElementById('seguridadAlerta').style.display = 'block';
+
+      const dia = new Date(fechaVal).getDay();
+      const tarifas = (dia === 5 || dia === 6 || dia === 0) ? tarifasVieDom : tarifasLunJue;
+      
+      const c = {
+        m: parseInt(document.getElementById('mayores').value) || 0,
+        j: parseInt(document.getElementById('jubilados').value) || 0,
+        v: parseInt(document.getElementById('juveniles').value) || 0,
+        n: parseInt(document.getElementById('menores').value) || 0,
+        i: parseInt(document.getElementById('infantiles').value) || 0
+      };
+
+      const totalInvitados = Object.values(c).reduce((a, b) => a + b, 0);
+      document.getElementById('totalInvitados').value = totalInvitados;
+
+      let subtotal = 0;
+      if (tipo === 'cerrado') {
+        subtotal = (c.m * tarifas.mayores) + (c.j * tarifas.jubilados) + (c.v * tarifas.juveniles) + (c.n * tarifas.menores);
+        if (document.getElementById('inflable').checked) subtotal += 20000;
+        if (necesitaSeguridad) subtotal += 20000;
+        if (document.getElementById('cumpleanero').checked) subtotal -= (Math.min(10, c.m) * tarifas.mayores);
+      }
+
+      document.getElementById('totalCalculado').textContent = subtotal.toLocaleString('es-AR');
+      document.getElementById('totalDiv').style.display = subtotal > 0 ? 'block' : 'none';
+      document.getElementById('btnConfirmar').disabled = totalInvitados === 0;
+    }
+
+    function mostrarConfirmacion() {
+      const detalle = `
+        <p><strong>Socio:</strong> ${socioValidado}</p>
+        <p><strong>Fecha:</strong> ${document.getElementById('fechaEvento').value}</p>
+        <p><strong>Invitados:</strong> ${document.getElementById('totalInvitados').value}</p>
+        <p style="color:red; font-size:1.2em;"><strong>Total: ARS $${document.getElementById('totalCalculado').textContent}</strong></p>
+      `;
+      document.getElementById('detalleAgenda').innerHTML = detalle;
+      document.getElementById('modalConfirmacion').classList.add('activa');
+    }
+
+    function confirmarYGuardar() {
+      const totalCalculadoTexto = document.getElementById('totalCalculado').textContent;
+      const params = new URLSearchParams({
+        action: 'guardarAgenda',
+        numSocio: document.getElementById('numSocio').value || ADMIN_SOCIO,
+        socio: socioValidado,
+        tipo: document.getElementById('tipoQuincho').value,
+        fechaEvento: document.getElementById('fechaEvento').value,
+        horaInicio: document.getElementById('horaInicio').value,
+        horaFin: document.getElementById('horaFin').value,
+        totalInvitados: document.getElementById('totalInvitados').value,
+        total: totalCalculadoTexto.replace(/\./g, ''),
+        listaInvitados: document.getElementById('listaInvitados').value
+      });
+
+      mostrarCargando("Guardando en la nube...");
+      fetch(`${APPS_SCRIPT_URL}?${params}`)
+        .then(r => r.json())
+        .then(res => {
+          ocultarCargando();
+          if (res.exito) {
+            alert(`✅ Agenda Guardada!\nTotal: ARS $${totalCalculadoTexto}`);
+            location.reload();
+          } else { alert("Error: " + res.mensaje); }
+        })
+        .catch(() => { ocultarCargando(); alert("Agenda enviada. Verifica planilla."); location.reload(); });
+    }
+
+    function toggleCheckbox(id) { document.getElementById(id).checked = !document.getElementById(id).checked; calcularTotal(); }
+    function onTipoChange() { calcularTotal(); }
+    function cerrarModal(id) { document.getElementById(id).classList.remove('activa'); }
+    function cerrarAlertaSeguridad() { document.getElementById('seguridadAlerta').style.display = 'none'; }
+    function mostrarCargando(m) { document.getElementById('loadingMessage').textContent = m; document.getElementById('loadingModal').classList.add('activa'); }
+    function ocultarCargando() { document.getElementById('loadingModal').classList.remove('activa'); }
+    function copiarCBU() { navigator.clipboard.writeText('00700047-20000001084140').then(() => alert('CBU Copiado')); }
+  </script>
+</body>
+</html>
