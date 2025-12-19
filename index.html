@@ -161,7 +161,7 @@
 
  <script>
   // 1. PEGA AQUÍ LA URL QUE COPIASTE DE GOOGLE APPS SCRIPT
-  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzkyvy9AjQEIICseXqdjm2biAbHVO3sm4wx2BRNQgutTXjqhCNS7IeVNrm0c-OM8jrvMA/exec';
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxHSb00642C_PBRsh9H5Up9-Jl1an9idYRZ2y0dOUMqL8JzAWwkVVjm7vCpEYiCmf4j/exec';
 
   const TARIFAS = { may: 7700, juv: 5500, jub: 4900, men: 4000, inf: 0, inflable: 20000, seguridad: 20000 };
   let socioNombre = "";
@@ -299,42 +299,46 @@
   }
 
   // --- FUNCIÓN DE GUARDADO REAL ---
-  function enviarDatosFinales() {
-    const btn = event.target;
-    btn.innerText = "⏳ Guardando...";
-    btn.disabled = true;
+  ffunction enviarDatosFinales() {
+  const btn = event.target;
+  const originalText = btn.innerText;
+  btn.innerText = "⏳ Guardando...";
+  btn.disabled = true;
 
-    const params = new URLSearchParams({
-      action: 'guardarAgenda',
-      numSocio: document.getElementById('numSocio').value,
-      socio: socioNombre,
-      tipo: document.getElementById('tipoQuincho').value,
-      fechaEvento: document.getElementById('fechaEvento').value,
-      horaInicio: document.getElementById('horaInicio').value,
-      horaFin: document.getElementById('horaFin').value,
-      totalInvitados: document.getElementById('totalInvitados').value,
-      total: document.getElementById('montoVisual').innerText.replace(/\./g, ''),
-      listaInvitados: `Mayores: ${document.getElementById('may').value}, Juveniles: ${document.getElementById('juv').value}, Jubilados: ${document.getElementById('jub').value}, Menores: ${document.getElementById('men').value}`
+  // Recolectamos los datos
+  const numSocio = document.getElementById('numSocio').value;
+  const socio = socioNombre; // La variable global que guardamos al validar
+  const tipo = document.getElementById('tipoQuincho').value;
+  const fecha = document.getElementById('fechaEvento').value;
+  const hIni = document.getElementById('horaInicio').value;
+  const hFin = document.getElementById('horaFin').value;
+  const invitados = document.getElementById('totalInvitados').value;
+  const totalStr = document.getElementById('montoVisual').innerText;
+  const detalle = `Mayores: ${document.getElementById('may').value}, Juveniles: ${document.getElementById('juv').value}, Jubilados: ${document.getElementById('jub').value}, Menores: ${document.getElementById('men').value}`;
+
+  // Construimos la URL con todos los parámetros
+  const urlFinal = `${APPS_SCRIPT_URL}?action=guardarAgenda&numSocio=${encodeURIComponent(numSocio)}&socio=${encodeURIComponent(socio)}&tipo=${encodeURIComponent(tipo)}&fechaEvento=${encodeURIComponent(fecha)}&horaInicio=${encodeURIComponent(hIni)}&horaFin=${encodeURIComponent(hFin)}&totalInvitados=${encodeURIComponent(invitados)}&total=${encodeURIComponent(totalStr)}&listaInvitados=${encodeURIComponent(detalle)}`;
+
+  fetch(urlFinal, { method: 'GET' }) // Usamos GET para evitar problemas de CORS en Apps Script
+    .then(r => r.json())
+    .then(res => {
+      if (res.exito) {
+        alert("✅ ¡Agenda guardada correctamente en el sistema!");
+        window.open(`https://wa.me/5491151585858?text=Hola! Envío comprobante de reserva Quincho de ${socio}`, '_blank');
+        location.reload();
+      } else {
+        alert("❌ Error del servidor: " + res.mensaje);
+      }
+    })
+    .catch(e => {
+      console.error(e);
+      alert("⚠️ Error de conexión al intentar guardar. Reintente.");
+    })
+    .finally(() => {
+      btn.innerText = originalText;
+      btn.disabled = false;
     });
-
-    fetch(`${APPS_SCRIPT_URL}?${params}`)
-      .then(r => r.json())
-      .then(res => {
-        if (res.exito) {
-          alert("✅ ¡Agenda guardada correctamente!\n\nAhora envía el comprobante por WhatsApp.");
-          window.open(`https://wa.me/5491151585858?text=Hola! Envío comprobante de reserva Quincho de ${socioNombre}`, '_blank');
-          location.reload();
-        } else {
-          alert("❌ Error al guardar: " + res.mensaje);
-        }
-      })
-      .catch(e => alert("Error al conectar con el servidor"))
-      .finally(() => {
-        btn.innerText = "💾 Confirmar";
-        btn.disabled = false;
-      });
-  }
-
+}
   function cerrarModal(id) { document.getElementById(id).classList.remove('activa'); }
 </script>
 </body>
