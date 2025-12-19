@@ -74,7 +74,7 @@
         <label>Fecha de Nacimiento</label>
         <input type="text" id="fechaNac" placeholder="DD/MM/AAAA" oninput="mascaraFecha(this)">
       </div>
-      <button onclick="validarSocio()">🚀 Ingresar</button>
+      <button id="btnValidar" onclick="validarSocio()">🚀 Ingresar</button>
     </div>
   </div>
 
@@ -154,13 +154,12 @@
 
       <div class="grid-2" style="margin-top:20px;">
         <button onclick="cerrarModal('modalFinal')" style="background:#94a3b8">⚙️ Editar</button>
-        <button onclick="alert('✅ ¡Agenda Guardada! Por favor envíe el comprobante de pago por WhatsApp.')" style="background:var(--verde)">💾 Confirmar</button>
+        <button id="btnEnviar" onclick="enviarDatosFinales()" style="background:var(--verde)">💾 Confirmar y Guardar</button>
       </div>
     </div>
   </div>
 
- <script>
-  // 1. PEGA AQUÍ LA URL QUE COPIASTE DE GOOGLE APPS SCRIPT
+<script>
   const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxHSb00642C_PBRsh9H5Up9-Jl1an9idYRZ2y0dOUMqL8JzAWwkVVjm7vCpEYiCmf4j/exec';
 
   const TARIFAS = { may: 7700, juv: 5500, jub: 4900, men: 4000, inf: 0, inflable: 20000, seguridad: 20000 };
@@ -168,7 +167,6 @@
   let descuentoAplicado = 0;
   let seguridadActiva = false;
 
-  // --- FUNCIONES DE MÁSCARA ---
   function mascaraFecha(i) {
     let v = i.value.replace(/\D/g,'');
     if (v.length > 2) v = v.substring(0,2) + '/' + v.substring(2);
@@ -182,19 +180,16 @@
     i.value = v;
   }
 
-  // --- FUNCIÓN DE VALIDACIÓN REAL ---
   function validarSocio() {
     const socio = document.getElementById('numSocio').value;
     const fecha = document.getElementById('fechaNac').value;
+    const btn = document.getElementById('btnValidar');
 
     if (!socio || !fecha) {
       alert("Por favor completa ambos campos");
       return;
     }
 
-    // Cambiamos el botón para mostrar carga
-    const btn = event.target;
-    const originalText = btn.innerText;
     btn.innerText = "⏳ Verificando...";
     btn.disabled = true;
 
@@ -211,12 +206,11 @@
       })
       .catch(e => alert("Error de conexión con el servidor"))
       .finally(() => {
-        btn.innerText = originalText;
+        btn.innerText = "🚀 Ingresar";
         btn.disabled = false;
       });
   }
 
-  // --- LÓGICA DE CÁLCULO ---
   function calcularTotal() {
     const hFin = document.getElementById('horaFin').value;
     let counts = {
@@ -268,7 +262,7 @@
   }
 
   function alertaInflable(cb) {
-    if(cb.checked) alert("🎈 AVISO INFLABLE:\n\nEn los casos que se desea traer inflable se tendria que abonar locacion $20.000, previo al evento debera enviar la ART y/o seguro de accidentes personales con cláusula de no repetición a nombre del CENTRO ASTURIANO DE BUENOS AIRES Cuit: 30-54586286-3.");
+    if(cb.checked) alert("🎈 AVISO INFLABLE:\n\nEn los casos que se desea traer inflable se tendría que abonar locación $20.000, previo al evento deberá enviar la ART y/o seguro de accidentes personales con cláusula de no repetición a nombre del CENTRO ASTURIANO DE BUENOS AIRES Cuit: 30-54586286-3.");
   }
 
   function alertaCumple(cb) {
@@ -283,7 +277,7 @@
       <div class="item-detalle"><span>Socio:</span> <span>${socioNombre}</span></div>
       <div class="item-detalle"><span>📅 Fecha:</span> <span>${document.getElementById('fechaEvento').value}</span></div>
       <div class="item-detalle"><span>🕒 Horario:</span> <span>${document.getElementById('horaInicio').value} a ${document.getElementById('horaFin').value}</span></div>
-      <div class="item-detalle"><span>👥 Mayores:</span> <span>${document.getElementById('may').value}</span></div>
+      <div class="item-detalle"><span>👥 Invitados:</span> <span>${document.getElementById('totalInvitados').value}</span></div>
       <div class="item-detalle"><span>🎈 Inflable:</span> <span>$${infVal.toLocaleString('es-AR')}</span></div>
       <div class="item-detalle"><span>👮 Seguridad:</span> <span>$${segVal.toLocaleString('es-AR')}</span></div>
     `;
@@ -298,47 +292,40 @@
     document.getElementById('modalFinal').classList.add('activa');
   }
 
-  // --- FUNCIÓN DE GUARDADO REAL ---
-  ffunction enviarDatosFinales() {
-  const btn = event.target;
-  const originalText = btn.innerText;
-  btn.innerText = "⏳ Guardando...";
-  btn.disabled = true;
+  function enviarDatosFinales() {
+    const btn = document.getElementById('btnEnviar');
+    btn.innerText = "⏳ Guardando...";
+    btn.disabled = true;
 
-  // Recolectamos los datos
-  const numSocio = document.getElementById('numSocio').value;
-  const socio = socioNombre; // La variable global que guardamos al validar
-  const tipo = document.getElementById('tipoQuincho').value;
-  const fecha = document.getElementById('fechaEvento').value;
-  const hIni = document.getElementById('horaInicio').value;
-  const hFin = document.getElementById('horaFin').value;
-  const invitados = document.getElementById('totalInvitados').value;
-  const totalStr = document.getElementById('montoVisual').innerText;
-  const detalle = `Mayores: ${document.getElementById('may').value}, Juveniles: ${document.getElementById('juv').value}, Jubilados: ${document.getElementById('jub').value}, Menores: ${document.getElementById('men').value}`;
+    const numSocio = document.getElementById('numSocio').value;
+    const tipo = document.getElementById('tipoQuincho').value;
+    const fecha = document.getElementById('fechaEvento').value;
+    const hIni = document.getElementById('horaInicio').value;
+    const hFin = document.getElementById('horaFin').value;
+    const invitados = document.getElementById('totalInvitados').value;
+    const totalStr = document.getElementById('montoVisual').innerText;
+    const detalle = `May: ${document.getElementById('may').value}, Juv: ${document.getElementById('juv').value}, Jub: ${document.getElementById('jub').value}, Men: ${document.getElementById('men').value}`;
 
-  // Construimos la URL con todos los parámetros
-  const urlFinal = `${APPS_SCRIPT_URL}?action=guardarAgenda&numSocio=${encodeURIComponent(numSocio)}&socio=${encodeURIComponent(socio)}&tipo=${encodeURIComponent(tipo)}&fechaEvento=${encodeURIComponent(fecha)}&horaInicio=${encodeURIComponent(hIni)}&horaFin=${encodeURIComponent(hFin)}&totalInvitados=${encodeURIComponent(invitados)}&total=${encodeURIComponent(totalStr)}&listaInvitados=${encodeURIComponent(detalle)}`;
+    const urlFinal = `${APPS_SCRIPT_URL}?action=guardarAgenda&numSocio=${encodeURIComponent(numSocio)}&socio=${encodeURIComponent(socioNombre)}&tipo=${encodeURIComponent(tipo)}&fechaEvento=${encodeURIComponent(fecha)}&horaInicio=${encodeURIComponent(hIni)}&horaFin=${encodeURIComponent(hFin)}&totalInvitados=${encodeURIComponent(invitados)}&total=${encodeURIComponent(totalStr)}&listaInvitados=${encodeURIComponent(detalle)}`;
 
-  fetch(urlFinal, { method: 'GET' }) // Usamos GET para evitar problemas de CORS en Apps Script
-    .then(r => r.json())
-    .then(res => {
-      if (res.exito) {
-        alert("✅ ¡Agenda guardada correctamente en el sistema!");
-        window.open(`https://wa.me/5491151585858?text=Hola! Envío comprobante de reserva Quincho de ${socio}`, '_blank');
-        location.reload();
-      } else {
-        alert("❌ Error del servidor: " + res.mensaje);
-      }
-    })
-    .catch(e => {
-      console.error(e);
-      alert("⚠️ Error de conexión al intentar guardar. Reintente.");
-    })
-    .finally(() => {
-      btn.innerText = originalText;
-      btn.disabled = false;
-    });
-}
+    fetch(urlFinal, { method: 'GET' })
+      .then(r => r.json())
+      .then(res => {
+        if (res.exito) {
+          alert("✅ ¡Reserva guardada con éxito!");
+          window.open(`https://wa.me/5491151585858?text=Hola! Envío comprobante de reserva Quincho de ${socioNombre}`, '_blank');
+          location.reload();
+        } else {
+          alert("❌ Error: " + res.mensaje);
+        }
+      })
+      .catch(e => alert("⚠️ Error al conectar. Intente nuevamente."))
+      .finally(() => {
+        btn.innerText = "💾 Confirmar y Guardar";
+        btn.disabled = false;
+      });
+  }
+
   function cerrarModal(id) { document.getElementById(id).classList.remove('activa'); }
 </script>
 </body>
