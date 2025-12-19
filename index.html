@@ -159,118 +159,183 @@
     </div>
   </div>
 
-  <script>
-    // Configuración de Precios
-    const TARIFAS = { may: 7700, juv: 5500, jub: 4900, men: 4000, inf: 0, inflable: 20000, seguridad: 20000 };
+ <script>
+  // 1. PEGA AQUÍ LA URL QUE COPIASTE DE GOOGLE APPS SCRIPT
+  const APPS_SCRIPT_URL = '1mi1-ZSy5vdI4K_P3w__XR7_KeB5VTUq4aAFmrqVpRaE';
 
-    function mascaraFecha(i) {
-      let v = i.value.replace(/\D/g,'');
-      if (v.length > 2) v = v.substring(0,2) + '/' + v.substring(2);
-      if (v.length > 5) v = v.substring(0,5) + '/' + v.substring(5,9);
-      i.value = v;
+  const TARIFAS = { may: 7700, juv: 5500, jub: 4900, men: 4000, inf: 0, inflable: 20000, seguridad: 20000 };
+  let socioNombre = "";
+  let descuentoAplicado = 0;
+  let seguridadActiva = false;
+
+  // --- FUNCIONES DE MÁSCARA ---
+  function mascaraFecha(i) {
+    let v = i.value.replace(/\D/g,'');
+    if (v.length > 2) v = v.substring(0,2) + '/' + v.substring(2);
+    if (v.length > 5) v = v.substring(0,5) + '/' + v.substring(5,9);
+    i.value = v;
+  }
+
+  function mascaraHora(i) {
+    let v = i.value.replace(/\D/g,'');
+    if (v.length > 2) v = v.substring(0,2) + ':' + v.substring(2,4);
+    i.value = v;
+  }
+
+  // --- FUNCIÓN DE VALIDACIÓN REAL ---
+  function validarSocio() {
+    const socio = document.getElementById('numSocio').value;
+    const fecha = document.getElementById('fechaNac').value;
+
+    if (!socio || !fecha) {
+      alert("Por favor completa ambos campos");
+      return;
     }
 
-    function mascaraHora(i) {
-      let v = i.value.replace(/\D/g,'');
-      if (v.length > 2) v = v.substring(0,2) + ':' + v.substring(2,4);
-      i.value = v;
+    // Cambiamos el botón para mostrar carga
+    const btn = event.target;
+    const originalText = btn.innerText;
+    btn.innerText = "⏳ Verificando...";
+    btn.disabled = true;
+
+    fetch(`${APPS_SCRIPT_URL}?action=validarSocio&numSocio=${socio}&fechaNac=${fecha}`)
+      .then(r => r.json())
+      .then(res => {
+        if (res.exito) {
+          socioNombre = res.nombre;
+          document.getElementById('modalValidacion').classList.remove('activa');
+          document.getElementById('app').style.display = 'block';
+        } else {
+          alert("❌ " + res.mensaje);
+        }
+      })
+      .catch(e => alert("Error de conexión con el servidor"))
+      .finally(() => {
+        btn.innerText = originalText;
+        btn.disabled = false;
+      });
+  }
+
+  // --- LÓGICA DE CÁLCULO ---
+  function calcularTotal() {
+    const hFin = document.getElementById('horaFin').value;
+    let counts = {
+      may: parseInt(document.getElementById('may').value) || 0,
+      juv: parseInt(document.getElementById('juv').value) || 0,
+      jub: parseInt(document.getElementById('jub').value) || 0,
+      men: parseInt(document.getElementById('men').value) || 0,
+      inf: parseInt(document.getElementById('inf').value) || 0
+    };
+    
+    const totalInv = Object.values(counts).reduce((a, b) => a + b, 0);
+    document.getElementById('totalInvitados').value = totalInv;
+
+    let subtotalInvitados = (counts.may * TARIFAS.may) + (counts.juv * TARIFAS.juv) + (counts.jub * TARIFAS.jub) + (counts.men * TARIFAS.men);
+    
+    descuentoAplicado = 0;
+    if (document.getElementById('cumple').checked) {
+      let cupo = 10;
+      const orden = ['may', 'juv', 'jub', 'men'];
+      orden.forEach(tipo => {
+        if (cupo > 0 && counts[tipo] > 0) {
+          let descontar = Math.min(counts[tipo], cupo);
+          descuentoAplicado += (descontar * TARIFAS[tipo]);
+          cupo -= descontar;
+        }
+      });
     }
 
-    function alertaInflable(cb) {
-      if(cb.checked) alert("🎈 AVISO INFLABLE:\n\nEn los casos que se desea traer inflable se tendria que abonar locacion $20.000, previo al evento debera enviar la ART y/o seguro de accidentes personales con cláusula de no repetición a nombre del CENTRO ASTURIANO DE BUENOS AIRES Cuit: 30-54586286-3.");
+    let total = subtotalInvitados - descuentoAplicado;
+
+    seguridadActiva = false;
+    if (hFin.includes(':')) {
+      let [hh, mm] = hFin.split(':').map(Number);
+      let minTotales = (hh * 60) + mm;
+      if (minTotales >= 10 && minTotales <= 300) {
+        total += TARIFAS.seguridad;
+        seguridadActiva = true;
+        if (!window.seguridadAlerta) {
+          alert("👮 SEGURIDAD:\nPara reuniones pasadas las 00:00hs se tiene que abonar la seguridad correspondiente a 5 horas ($20.000).");
+          window.seguridadAlerta = true;
+        }
+      } else { window.seguridadAlerta = false; }
     }
 
-    function alertaCumple(cb) {
-      if(cb.checked) alert("🎉 AVISO CUMPLEAÑERO:\n\nEs un beneficio único para el socio cumpleañero para ser uso por única vez desde la fecha de nacimiento hasta 30 días corridos.");
+    if (document.getElementById('inflable').checked) total += TARIFAS.inflable;
+
+    document.getElementById('montoVisual').innerText = total.toLocaleString('es-AR');
+    document.getElementById('btnConfirmar').disabled = (totalInv === 0);
+  }
+
+  function alertaInflable(cb) {
+    if(cb.checked) alert("🎈 AVISO INFLABLE:\n\nEn los casos que se desea traer inflable se tendria que abonar locacion $20.000, previo al evento debera enviar la ART y/o seguro de accidentes personales con cláusula de no repetición a nombre del CENTRO ASTURIANO DE BUENOS AIRES Cuit: 30-54586286-3.");
+  }
+
+  function alertaCumple(cb) {
+    if(cb.checked) alert("🎉 AVISO CUMPLEAÑERO:\n\nEs un beneficio único para el socio cumpleañero para ser uso por única vez desde la fecha de nacimiento hasta 30 días corridos.");
+  }
+
+  function abrirConfirmacion() {
+    const segVal = seguridadActiva ? TARIFAS.seguridad : 0;
+    const infVal = document.getElementById('inflable').checked ? TARIFAS.inflable : 0;
+
+    let html = `
+      <div class="item-detalle"><span>Socio:</span> <span>${socioNombre}</span></div>
+      <div class="item-detalle"><span>📅 Fecha:</span> <span>${document.getElementById('fechaEvento').value}</span></div>
+      <div class="item-detalle"><span>🕒 Horario:</span> <span>${document.getElementById('horaInicio').value} a ${document.getElementById('horaFin').value}</span></div>
+      <div class="item-detalle"><span>👥 Mayores:</span> <span>${document.getElementById('may').value}</span></div>
+      <div class="item-detalle"><span>🎈 Inflable:</span> <span>$${infVal.toLocaleString('es-AR')}</span></div>
+      <div class="item-detalle"><span>👮 Seguridad:</span> <span>$${segVal.toLocaleString('es-AR')}</span></div>
+    `;
+
+    if(descuentoAplicado > 0) {
+      html += `<div class="item-detalle bonus"><span>🎁 Bonificación 10p:</span> <span>- $${descuentoAplicado.toLocaleString('es-AR')}</span></div>`;
     }
 
-    function validarSocio() {
-      document.getElementById('modalValidacion').classList.remove('activa');
-      document.getElementById('app').style.display = 'block';
-    }
+    html += `<div class="total-box"><b>TOTAL FINAL: ARS $${document.getElementById('montoVisual').innerText}</b></div>`;
 
-    let descuentoAplicado = 0;
-    let seguridadActiva = false;
+    document.getElementById('desgloseFinal').innerHTML = html;
+    document.getElementById('modalFinal').classList.add('activa');
+  }
 
-    function calcularTotal() {
-      const hFin = document.getElementById('horaFin').value;
-      let counts = {
-        may: parseInt(document.getElementById('may').value) || 0,
-        juv: parseInt(document.getElementById('juv').value) || 0,
-        jub: parseInt(document.getElementById('jub').value) || 0,
-        men: parseInt(document.getElementById('men').value) || 0,
-        inf: parseInt(document.getElementById('inf').value) || 0
-      };
-      
-      const totalInv = Object.values(counts).reduce((a, b) => a + b, 0);
-      document.getElementById('totalInvitados').value = totalInv;
+  // --- FUNCIÓN DE GUARDADO REAL ---
+  function enviarDatosFinales() {
+    const btn = event.target;
+    btn.innerText = "⏳ Guardando...";
+    btn.disabled = true;
 
-      // Cálculo base
-      let subtotalInvitados = (counts.may * TARIFAS.may) + (counts.juv * TARIFAS.juv) + (counts.jub * TARIFAS.jub) + (counts.men * TARIFAS.men);
-      
-      // Lógica Bonificación Cumpleañero (10 invitados en orden)
-      descuentoAplicado = 0;
-      if (document.getElementById('cumple').checked) {
-        let cupo = 10;
-        const orden = ['may', 'juv', 'jub', 'men'];
-        orden.forEach(tipo => {
-          if (cupo > 0 && counts[tipo] > 0) {
-            let descontar = Math.min(counts[tipo], cupo);
-            descuentoAplicado += (descontar * TARIFAS[tipo]);
-            cupo -= descontar;
-          }
-        });
-      }
+    const params = new URLSearchParams({
+      action: 'guardarAgenda',
+      numSocio: document.getElementById('numSocio').value,
+      socio: socioNombre,
+      tipo: document.getElementById('tipoQuincho').value,
+      fechaEvento: document.getElementById('fechaEvento').value,
+      horaInicio: document.getElementById('horaInicio').value,
+      horaFin: document.getElementById('horaFin').value,
+      totalInvitados: document.getElementById('totalInvitados').value,
+      total: document.getElementById('montoVisual').innerText.replace(/\./g, ''),
+      listaInvitados: `Mayores: ${document.getElementById('may').value}, Juveniles: ${document.getElementById('juv').value}, Jubilados: ${document.getElementById('jub').value}, Menores: ${document.getElementById('men').value}`
+    });
 
-      let total = subtotalInvitados - descuentoAplicado;
+    fetch(`${APPS_SCRIPT_URL}?${params}`)
+      .then(r => r.json())
+      .then(res => {
+        if (res.exito) {
+          alert("✅ ¡Agenda guardada correctamente!\n\nAhora envía el comprobante por WhatsApp.");
+          window.open(`https://wa.me/5491151585858?text=Hola! Envío comprobante de reserva Quincho de ${socioNombre}`, '_blank');
+          location.reload();
+        } else {
+          alert("❌ Error al guardar: " + res.mensaje);
+        }
+      })
+      .catch(e => alert("Error al conectar con el servidor"))
+      .finally(() => {
+        btn.innerText = "💾 Confirmar";
+        btn.disabled = false;
+      });
+  }
 
-      // Lógica Seguridad Nocturna (00:10 a 05:00)
-      seguridadActiva = false;
-      if (hFin.includes(':')) {
-        let [hh, mm] = hFin.split(':').map(Number);
-        let minTotales = (hh * 60) + mm;
-        if (minTotales >= 10 && minTotales <= 300) {
-          total += TARIFAS.seguridad;
-          seguridadActiva = true;
-          if (!window.seguridadAlerta) {
-            alert("👮 SEGURIDAD:\nPara reuniones pasadas las 00:00hs se tiene que abonar la seguridad correspondiente a 5 horas ($20.000).");
-            window.seguridadAlerta = true;
-          }
-        } else { window.seguridadAlerta = false; }
-      }
-
-      if (document.getElementById('inflable').checked) total += TARIFAS.inflable;
-
-      document.getElementById('montoVisual').innerText = total.toLocaleString('es-AR');
-      document.getElementById('btnConfirmar').disabled = (totalInv === 0);
-    }
-
-    function abrirConfirmacion() {
-      const segVal = seguridadActiva ? TARIFAS.seguridad : 0;
-      const infVal = document.getElementById('inflable').checked ? TARIFAS.inflable : 0;
-
-      let html = `
-        <div class="item-detalle"><span>📅 Fecha:</span> <span>${document.getElementById('fechaEvento').value}</span></div>
-        <div class="item-detalle"><span>🕒 Horario:</span> <span>${document.getElementById('horaInicio').value} a ${document.getElementById('horaFin').value}</span></div>
-        <div class="item-detalle"><span>👥 Mayores:</span> <span>${document.getElementById('may').value}</span></div>
-        <div class="item-detalle"><span>👥 Juveniles:</span> <span>${document.getElementById('juv').value}</span></div>
-        <div class="item-detalle"><span>👥 Jubilados:</span> <span>${document.getElementById('jub').value}</span></div>
-        <div class="item-detalle"><span>👥 Menores:</span> <span>${document.getElementById('men').value}</span></div>
-        <div class="item-detalle"><span>🎈 Locación Inflable:</span> <span>$${infVal.toLocaleString('es-AR')}</span></div>
-        <div class="item-detalle"><span>👮 Seguridad (5hs):</span> <span>$${segVal.toLocaleString('es-AR')}</span></div>
-      `;
-
-      if(descuentoAplicado > 0) {
-        html += `<div class="item-detalle bonus"><span>🎁 Bonificación Cumpleañero (10p):</span> <span>- $${descuentoAplicado.toLocaleString('es-AR')}</span></div>`;
-      }
-
-      html += `<div class="total-box"><b>TOTAL A PAGAR: ARS $${document.getElementById('montoVisual').innerText}</b></div>`;
-
-      document.getElementById('desgloseFinal').innerHTML = html;
-      document.getElementById('modalFinal').classList.add('activa');
-    }
-
-    function cerrarModal(id) { document.getElementById(id).classList.remove('activa'); }
-  </script>
+  function cerrarModal(id) { document.getElementById(id).classList.remove('activa'); }
+</script>
 </body>
 </html>
